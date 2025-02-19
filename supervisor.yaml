@@ -1,0 +1,85 @@
+esphome:
+  name: supervisor
+  platform: ESP8266
+  board: esp01
+
+wifi:
+  ssid: "XXX"
+  password: "XXX"
+
+logger:
+  level: DEBUG
+
+api:
+
+ota:
+  platform: esphome
+
+# Define the relay for rebooting the router (connected to GPIO0)
+switch:
+  - platform: gpio
+    pin: GPIO0
+    id: router_relay
+    inverted: true
+    name: "Router Relay"
+
+# Global variables to track consecutive failures, reboot attempts, and lockout state
+globals:
+  - id: fail_count
+    type: int
+    initial_value: '0'
+  - id: reboot_count
+    type: int
+    initial_value: '0'
+  - id: lockout
+    type: bool
+    initial_value: 'false'
+
+# Interval: Check connectivity every 60 seconds
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          // If in lockout, skip connectivity check.
+          if (id(lockout)) {
+            ESP_LOGD("router_rebooter", "Lockout active, skipping connectivity check");
+            return;
+          }
+          // Attempt a TCP connection to 8.8.8.8 on port 53.
+          WiFiClient client;
+          bool connected = client.connect("8.8.8.8", 53);
+          client.stop();
+          
+          if (connected) {
+            ESP_LOGD("router_rebooter", "Connectivity OK");
+            id(fail_count) = 0;
+            id(reboot_count) = 0;
+          } else {
+            ESP_LOGD("router_rebooter", "Connectivity FAILED");
+            id(fail_count)++;
+            if (id(fail_count) >= 3) {
+              if (id(reboot_count) < 2) {
+                ESP_LOGD("router_rebooter", "Triggering router reboot attempt %d", id(reboot_count) + 1);
+                id(router_relay).turn_on();
+                delay(15000);  // Relay stays on for 15 seconds
+                id(router_relay).turn_off();
+                id(reboot_count)++;
+              } else {
+                ESP_LOGD("router_rebooter", "Max reboot attempts reached. Entering 30-minute lockout period.");
+                id(lockout) = true;
+              }
+              // Reset failure counter after action
+              id(fail_count) = 0;
+            }
+          }
+
+  # Interval: Every 30 minutes, if lockout is active, reset counters and clear lockout.
+  - interval: 30min
+    then:
+      - lambda: |-
+          if (id(lockout)) {
+            ESP_LOGD("router_rebooter", "Lockout period ended, resetting counters.");
+            id(reboot_count) = 0;
+            id(fail_count) = 0;
+            id(lockout) = false;
+          }
