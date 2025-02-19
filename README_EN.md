@@ -39,12 +39,9 @@ Use the ESPHome Dashboard or run:
 esphome supervisor.yaml logs
 to ensure the connectivity checks and reboot logic are functioning as expected.
 ## Configuration
--- **Connectivity Check:**
-The script attempts a TCP connection to 8.8.8.8 on port 53 every 60 seconds.
--- **Relay Control:**
-The relay is connected to D3 and toggled for 15 seconds during a reboot attempt.
--- **Lockout Period:**
-After two reboot attempts, the system waits 30 minutes before resetting the counters and resuming normal operation.
+- Connectivity Check: The script attempts a TCP connection to 8.8.8.8 on port 53 every 60 seconds.
+- Relay Control: The relay is connected to GPIO0 and toggled for 15 seconds during a reboot attempt.
+- Lockout Period: After two reboot attempts, the system waits 30 minutes before resetting the counters and resuming normal operation.
 ## Troubleshooting
 - Verify that the ESP8266 is properly connected to your WiFi network.
 - Ensure that the wiring for the relay is correct.
